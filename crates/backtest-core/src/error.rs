@@ -29,6 +29,23 @@ pub enum DomainError {
         expected: usize,
         actual: usize,
     },
+    InsufficientHistory {
+        minimum: usize,
+        actual: usize,
+    },
+    InvalidTimestamp {
+        index: usize,
+        previous_ns: i64,
+        current_ns: i64,
+    },
+    InvalidPrice {
+        index: usize,
+        reason: InvalidValue,
+    },
+    InsufficientInitialCapital,
+    NumericOverflow {
+        field: &'static str,
+    },
 }
 
 impl Display for DomainError {
@@ -53,6 +70,27 @@ impl Display for DomainError {
                 formatter,
                 "length mismatch for `{field}`: expected {expected}, got {actual}"
             ),
+            Self::InsufficientHistory { minimum, actual } => write!(
+                formatter,
+                "insufficient history: at least {minimum} minute points required, got {actual}"
+            ),
+            Self::InvalidTimestamp {
+                index,
+                previous_ns,
+                current_ns,
+            } => write!(
+                formatter,
+                "invalid timestamp at index {index}: expected exactly 60 seconds after {previous_ns}, got {current_ns}"
+            ),
+            Self::InvalidPrice { index, reason } => {
+                write!(formatter, "invalid close at index {index}: {reason}")
+            }
+            Self::InsufficientInitialCapital => formatter.write_str(
+                "insufficient initial capital: the first 70% margin budget buys zero quantity steps",
+            ),
+            Self::NumericOverflow { field } => {
+                write!(formatter, "numeric overflow while calculating `{field}`")
+            }
         }
     }
 }
