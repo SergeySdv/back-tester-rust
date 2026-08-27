@@ -6,10 +6,12 @@ readonly NIGHTLY_TOOLCHAIN="nightly-2026-08-01"
 
 mkdir -p target/coverage
 
+cargo clean --target-dir target/llvm-cov-target
 cargo llvm-cov --workspace --all-features \
   --fail-under-lines 90 \
   --json --output-path target/coverage/rust-lines.json
 
+cargo clean --target-dir target/llvm-cov-target
 cargo +"${NIGHTLY_TOOLCHAIN}" llvm-cov --workspace --all-features \
   --branch --json --output-path target/coverage/rust-branches.json
 

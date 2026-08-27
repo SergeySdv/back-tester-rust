@@ -16,7 +16,7 @@ fn dtypes(schema: &[backtest_core::ColumnSchema]) -> Vec<&str> {
 }
 
 #[test]
-fn public_table_column_names_order_dtypes_and_nullability_match_section_10() {
+fn equity_schema_matches_section_10() {
     assert_eq!(
         names(EQUITY_SCHEMA),
         [
@@ -58,6 +58,10 @@ fn public_table_column_names_order_dtypes_and_nullability_match_section_10() {
             "float64", "float64", "float64", "float64", "float64", "float64", "bool"
         ]
     );
+}
+
+#[test]
+fn trade_and_tranche_column_names_match_section_10() {
     assert_eq!(
         names(COMPLETED_TRADES_SCHEMA),
         [
@@ -99,6 +103,10 @@ fn public_table_column_names_order_dtypes_and_nullability_match_section_10() {
             "locked_margin"
         ]
     );
+}
+
+#[test]
+fn reserve_and_summary_column_names_match_section_10() {
     assert_eq!(
         names(RESERVE_ATTEMPTS_SCHEMA),
         [
@@ -142,6 +150,10 @@ fn public_table_column_names_order_dtypes_and_nullability_match_section_10() {
             "any_margin_breach"
         ]
     );
+}
+
+#[test]
+fn table_dtypes_and_nullability_match_section_10() {
     assert!(
         COMPLETED_TRADES_SCHEMA
             .iter()
@@ -220,19 +232,8 @@ fn closed_enum_codes_expose_only_the_documented_string_values() {
 }
 
 #[test]
-fn buffers_have_equal_lengths_validity_masks_and_canonical_row_order() {
-    let result = run_backtest(
-        &timestamps(2_881),
-        &flat(2_881, 100.0),
-        dataset(),
-        config(),
-        &[
-            IvScenario::Stress3x { after_minutes: 720 },
-            IvScenario::Baseline,
-            IvScenario::Stress2x { after_minutes: 720 },
-        ],
-    )
-    .unwrap();
+fn equity_buffers_have_equal_lengths_validity_masks_and_canonical_order() {
+    let result = contract_result();
     let equity_len = result.equity.timestamp_ns.len();
     for length in [
         result.equity.scenario_id.len(),
@@ -264,23 +265,23 @@ fn buffers_have_equal_lengths_validity_masks_and_canonical_row_order() {
         ]
     );
     assert_eq!(result.completed_trades.trade_id, [0, 1, 0, 1, 0, 1]);
-    assert!(
+    assert_eq!(
         result
             .equity
             .active_trade_id_valid
             .iter()
             .filter(|valid| !**valid)
-            .count()
-            == 3
+            .count(),
+        3
     );
-    assert!(
+    assert_eq!(
         result
             .equity
             .active_iv_valid
             .iter()
             .filter(|valid| !**valid)
-            .count()
-            == 3
+            .count(),
+        3
     );
     assert!(
         result
@@ -289,7 +290,26 @@ fn buffers_have_equal_lengths_validity_masks_and_canonical_row_order() {
             .iter()
             .all(|value| value.is_finite())
     );
+}
 
+fn contract_result() -> backtest_core::BacktestResult {
+    run_backtest(
+        &timestamps(2_881),
+        &flat(2_881, 100.0),
+        dataset(),
+        config(),
+        &[
+            IvScenario::Stress3x { after_minutes: 720 },
+            IvScenario::Baseline,
+            IvScenario::Stress2x { after_minutes: 720 },
+        ],
+    )
+    .unwrap()
+}
+
+#[test]
+fn trade_and_tranche_buffers_have_equal_lengths() {
+    let result = contract_result();
     let trades_len = result.completed_trades.trade_id.len();
     for length in [
         result.completed_trades.scenario_id.len(),
@@ -332,6 +352,11 @@ fn buffers_have_equal_lengths_validity_masks_and_canonical_row_order() {
     ] {
         assert_eq!(length, tranches_len);
     }
+}
+
+#[test]
+fn reserve_and_summary_buffers_have_equal_lengths() {
+    let result = contract_result();
     let attempts_len = result.reserve_attempts.trade_id.len();
     for length in [
         result.reserve_attempts.scenario_id.len(),
