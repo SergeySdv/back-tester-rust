@@ -7,6 +7,12 @@ name = "back-tester"
 version = "0.1.0"
 requires-python = ">=3.9"
 description = "Synthetic Black-Scholes scenario backtester scaffold"
+dependencies = [
+    "numpy==2.0.2; python_version < '3.13'",
+    "numpy==2.3.2; python_version >= '3.13'",
+    "pandas==2.3.2",
+    "pyarrow==21.0.0",
+]
 
 [dependency-groups]
 dev = [
