@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+import back_tester.data as data_module
 import numpy as np
 import pandas as pd
 import pytest
-from back_tester import ColumnMapping, DatasetMetadata, load_minutes
+from back_tester import (
+    OKX_HISTORY_CANDLES_MAPPING,
+    ColumnMapping,
+    DatasetMetadata,
+    load_minutes,
+    load_okx_history_candles,
+)
 from back_tester.data import validate_run_arrays
 
 
@@ -46,6 +54,181 @@ def write_csv(tmp_path: Path, value: pd.DataFrame) -> Path:
     path = tmp_path / "input.csv"
     value.to_csv(path, index=False)
     return path
+
+
+def okx_frame() -> pd.DataFrame:
+    timestamps = 1_787_529_600_000 + np.arange(1_441, dtype=np.int64) * 60_000
+    close = np.linspace(77_712.5, 78_010.0, 1_441, dtype=np.float64)
+    return pd.DataFrame({
+        "timestamp_ms": timestamps,
+        "open": close, "high": close + 1.0, "low": close - 1.0, "close": close,
+        "volume_contracts": np.ones(1_441, dtype=np.float64),
+        "volume_base": np.ones(1_441, dtype=np.float64),
+        "volume_quote": np.ones(1_441, dtype=np.float64),
+        "confirm": np.ones(1_441, dtype=np.int64),
+    })
+
+
+def file_sha256(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def frame_bytes(value: pd.DataFrame, suffix: str) -> bytes:
+    output = BytesIO()
+    if suffix == ".csv":
+        value.to_csv(output, index=False)
+    else:
+        value.to_parquet(output, index=False)
+    return output.getvalue()
+
+
+def test_okx_history_candles_enforces_mapping_completion_and_identity(tmp_path: Path) -> None:
+    path = write_csv(tmp_path, okx_frame())
+    checksum = file_sha256(path)
+
+    result = load_okx_history_candles(path, expected_sha256=checksum)
+
+    assert OKX_HISTORY_CANDLES_MAPPING == ColumnMapping("timestamp_ms", "close", "ms")
+    assert result.timestamps_ns[0] == 1_787_529_600_000_000_000
+    assert result.close[0] == 77_712.5
+    assert result.metadata.dataset_id.endswith(f"sha256:{checksum}")
+    assert result.metadata.source == "OKX public REST v5 GET /api/v5/market/history-candles"
+    assert result.metadata.symbol == "BTC-USDT-SWAP"
+    assert result.metadata.interval_seconds == 60
+    assert result.metadata.timezone == "UTC"
+
+
+@pytest.mark.parametrize("suffix", [".csv", ".parquet"])
+def test_okx_history_candles_hashes_and_parses_one_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suffix: str
+) -> None:
+    path = tmp_path / f"input{suffix}"
+    original = okx_frame()
+    replacement = okx_frame()
+    replacement["close"] += 10_000.0
+    original_bytes = frame_bytes(original, suffix)
+    replacement_bytes = frame_bytes(replacement, suffix)
+    path.write_bytes(original_bytes)
+    original_snapshot = data_module._read_snapshot
+
+    def snapshot_then_replace(source_path: Path) -> bytes:
+        snapshot = original_snapshot(source_path)
+        source_path.write_bytes(replacement_bytes)
+        return snapshot
+
+    monkeypatch.setattr(data_module, "_read_snapshot", snapshot_then_replace)
+    checksum = file_sha256(path)
+    result = load_okx_history_candles(path, expected_sha256=checksum)
+
+    assert result.close[0] == original["close"].iloc[0]
+    assert result.close[0] != replacement["close"].iloc[0]
+    assert result.metadata.dataset_id.endswith(f"sha256:{checksum}")
+    assert path.read_bytes() == replacement_bytes
+
+
+def test_okx_history_candles_rejects_checksum_schema_and_incomplete_rows(
+    tmp_path: Path,
+) -> None:
+    path = write_csv(tmp_path, okx_frame())
+    with pytest.raises(ValueError, match="SHA256 mismatch"):
+        load_okx_history_candles(path, expected_sha256="0" * 64)
+
+    invalid = okx_frame().drop(columns="volume_quote")
+    path = write_csv(tmp_path, invalid)
+    with pytest.raises(ValueError, match="columns must exactly equal"):
+        load_okx_history_candles(path, expected_sha256=file_sha256(path))
+
+    invalid = okx_frame()
+    invalid.loc[100, "confirm"] = 0
+    path = write_csv(tmp_path, invalid)
+    with pytest.raises(ValueError, match="incomplete OKX candle at index 100"):
+        load_okx_history_candles(path, expected_sha256=file_sha256(path))
+
+    invalid = okx_frame().astype({"confirm": "float64"})
+    path = write_csv(tmp_path, invalid)
+    with pytest.raises(TypeError, match="confirm must have dtype int64"):
+        load_okx_history_candles(path, expected_sha256=file_sha256(path))
+
+    invalid = okx_frame()
+    invalid.loc[100, "timestamp_ms"] += 60_000
+    path = write_csv(tmp_path, invalid)
+    with pytest.raises(ValueError, match="invalid timestamp at index 100"):
+        load_okx_history_candles(path, expected_sha256=file_sha256(path))
+
+
+def test_okx_history_candles_rejects_reordered_schema_without_repair(
+    tmp_path: Path,
+) -> None:
+    invalid = okx_frame()
+    columns = invalid.columns.to_list()
+    columns[1], columns[2] = columns[2], columns[1]
+    invalid = invalid.loc[:, columns]
+    path = write_csv(tmp_path, invalid)
+    before = path.read_bytes()
+
+    with pytest.raises(ValueError, match="columns must exactly equal"):
+        load_okx_history_candles(path, expected_sha256=file_sha256(path))
+
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume_contracts",
+        "volume_base",
+        "volume_quote",
+    ],
+)
+def test_okx_history_candles_rejects_non_numeric_ohlcv_dtype(
+    tmp_path: Path, column: str
+) -> None:
+    invalid = okx_frame()
+    invalid[column] = "not-a-number"
+    path = write_csv(tmp_path, invalid)
+    before = path.read_bytes()
+
+    with pytest.raises(TypeError, match=rf"{column} must have dtype float64"):
+        load_okx_history_candles(path, expected_sha256=file_sha256(path))
+
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("column", ["timestamp_ms", "confirm"])
+def test_okx_history_candles_rejects_non_integer_identity_dtype(
+    tmp_path: Path, column: str
+) -> None:
+    invalid = okx_frame().astype({column: "float64"})
+    path = write_csv(tmp_path, invalid)
+    before = path.read_bytes()
+
+    with pytest.raises(TypeError, match=rf"{column} must have dtype int64"):
+        load_okx_history_candles(path, expected_sha256=file_sha256(path))
+
+    assert path.read_bytes() == before
+
+
+def test_tardis_raw_trades_cannot_be_silently_used_as_minute_rows(tmp_path: Path) -> None:
+    trades = pd.DataFrame({
+        "local_timestamp": np.arange(1_441, dtype=np.int64) * 1_000_000,
+        "price": np.linspace(16_500.0, 16_600.0, 1_441, dtype=np.float64),
+    })
+    original = trades.copy(deep=True)
+
+    with pytest.raises(ValueError, match="expected an exact 60-second step"):
+        load_minutes(
+            write_csv(tmp_path, trades),
+            mapping=ColumnMapping("local_timestamp", "price", "us"),
+            metadata=DatasetMetadata("tardis-trades", "Tardis raw trades", "BTC-USDT-SWAP", 60, "UTC"),
+        )
+
+    pd.testing.assert_frame_equal(trades, original)
 
 
 @pytest.mark.parametrize("problem", ["gap", "duplicate", "out_of_order"])

@@ -1,73 +1,73 @@
 # EPIC-001: workspace, pricing and coverage tooling
 
-- Статус: `READY`
-- Версия brief: `1.0`
-- Зависимости: нет
-- Внешний blocker: нет; файл OKX не требуется
+- Status: `READY`
+- Brief version: `1.0`
+- Dependencies: no
+- External blocker: no; OKX file is not required
 
-## Результат
+## Result
 
-Создан минимальный Rust workspace с независимым `backtest-core`, PyO3/maturin
-package scaffold и проверенной общей реализацией Black–Scholes для call/put и
-expiry payoff. Репозиторий генерирует машинно-читаемые line/branch coverage
-reports и автоматически проверяет пороги.
+Create a minimal Rust workspace with an independent `backtest-core`, a
+PyO3/maturin package scaffold, and one verified shared Rust implementation of
+Black–Scholes call/put pricing and expiry payoff. The repository generates machine-readable line/branch coverage
+reports and automatically checks thresholds.
 
 ## In scope
 
-- Cargo workspace, `backtest-core`, binding crate и тонкий Python package;
-- typed domain errors и минимальные config/model types, нужные pricing API;
-- `DatasetMetadata` и закрытый набор `baseline/stress_2x/stress_3x` с
-  валидацией, без backtest loop;
-- normal CDF, Black–Scholes с конечными настраиваемыми `r` и `q`, `T=0`
-  payoff и единым `SECONDS_PER_YEAR`;
+- Cargo workspace, `backtest-core`, binding crate and thin Python package;
+- typed domain errors and minimal config/model types required by the pricing API;
+- `DatasetMetadata` and closed set `baseline/stress_2x/stress_3x` with
+  validation, without backtest loop;
+- normal CDF, Black–Scholes with finite configurable `r` and `q`, `T=0`
+  payoff and a single `SECONDS_PER_YEAR`;
 - Rust/Python packaging smoke test;
-- `cargo-llvm-cov`, pinned nightly branch job, `pytest-cov` и единый threshold
+- `cargo-llvm-cov`, pinned nightly branch job, `pytest-cov` and a single threshold
   checker;
-- unit, boundary и property-style tests, необходимые этому scope.
+- unit, boundary and property-style tests required by this scope.
 
 ## Out of scope
 
-- minute lifecycle, позиции, reserve, margin, PnL и drawdown;
-- финальные result tables;
-- OKX loader и предположения о его колонках;
-- exchange API, historical options и live trading.
+- minute lifecycle, positions, reserve, margin, PnL and drawdown;
+- final result tables;
+- OKX loader and assumptions about its columns;
+- exchange API, historical options and live trading.
 
 ## Acceptance criteria
 
-- `E1-01`: `cargo build --workspace` проходит; `backtest-core` не зависит от
-  Python, pandas или exchange SDK.
-- `E1-02`: `maturin develop` в зафиксированном project environment создаёт
-  импортируемый Python package; smoke test вызывает native pricing bulk/API
-  без Python callback.
-- `E1-03`: call/put совпадают минимум с тремя независимыми reference cases в
-  документированном tolerance; минимум один case имеет ненулевые `r` и `q`.
-- `E1-04`: put-call parity, exact intrinsic payoff при `T=0`, ATM и
-  near-expiry boundaries покрыты прямыми тестами.
-- `E1-05`: невалидные/неfinite `S`, `K`, `T`, `sigma`, `r` и `q` возвращают
-  typed error, а не panic/NaN; отрицательный `T` запрещён.
-- `E1-06`: `DatasetMetadata` отклоняет пустые identity fields, interval не 60
-  секунд и timezone не UTC; scenario collection отклоняет empty, duplicate и
+- `E1-01`: `cargo build --workspace` passes; `backtest-core` does not depend on
+  Python, pandas or exchange SDK.
+- `E1-02`: `maturin develop` in a pinned project environment creates an
+  importable Python package; a smoke test calls the native bulk-pricing API
+  without Python callback.
+- `E1-03`: call/put matches at least three independent reference cases in
+  documented tolerance; at least one case has non-zero `r` and `q`.
+- `E1-04`: put-call parity, exact intrinsic payoff with `T=0`, ATM and
+  near-expiry boundaries are covered by direct tests.
+- `E1-05`: invalid/infinite `S`, `K`, `T`, `sigma`, `r` and `q` return
+  typed error, not panic/NaN; negative `T` is prohibited.
+- `E1-06`: `DatasetMetadata` rejects empty identity fields, an interval other
+  than 60 seconds, and a timezone other than UTC; scenario collection rejects empty, duplicate, and
   custom variants.
-- `E1-07`: одинаковые inputs дают одинаковые outputs; pricing formula имеет
-  один источник истины в Rust.
-- `E1-08`: репозиторий фиксирует совместимые версии `cargo-llvm-cov`, nightly
-  toolchain и `pytest-cov`; команды из архитектуры создают JSON reports.
-- `E1-09`: `scripts/check_coverage.py` отклоняет отсутствующий/невалидный report
-  и enforce пороги Rust lines 90%, Rust branches 85%, Python lines 85% и Python
-  branches 80%; фактические reports проходят эти пороги.
-- `E1-10`: format, Clippy warnings-as-errors, Rust/Python tests и documented
-  coverage commands завершаются с exit code 0.
+- `E1-07`: the same inputs give the same outputs; pricing formula has
+  one source of truth in Rust.
+- `E1-08`: the repository fixes compatible versions of `cargo-llvm-cov`, nightly
+  toolchain and `pytest-cov`; commands from the architecture create JSON reports.
+- `E1-09`: `scripts/check_coverage.py` rejects missing/invalid report
+  and enforces thresholds of Rust lines 90%, Rust branches 85%, Python lines 85%, and Python
+  branches 80%; actual reports pass these thresholds.
+- `E1-10`: format, Clippy warnings-as-errors, Rust/Python tests and documented
+  coverage commands exit with exit code 0.
 
-## Обязательные тесты и evidence
+## Mandatory tests and evidence
 
-- named Rust tests для каждого pricing/error criterion;
+- named Rust tests for each pricing/error criterion;
 - Python import/native exception smoke tests;
-- тест threshold checker на pass, below-threshold и malformed/missing input;
-- сохранённые в mini-report команды, test counts, проценты и версии tools;
-- review отсутствия state-machine/exchange scope creep.
+- threshold checker test for pass, below-threshold and malformed/missing input;
+- commands, test counts, percentages and versions of tools saved in the mini-report;
+- review of the lack of state-machine/exchange scope creep.
 
-## Handoff в EPIC-002
+## Handoff in EPIC-002
 
-Передать стабильные pricing/error/config types, `quantity_step`-совместимую
-числовую политику и зелёные quality gates. Изменять pricing semantics в
-`EPIC-002` без отдельного contract change нельзя.
+Pass stable pricing/error/config types, `quantity_step`-compatible
+numerical policy and green quality gates. Pricing semantics must not change in
+`EPIC-002` without a separate contract change.

@@ -15,5 +15,11 @@ Every run is labeled `synthetic Black–Scholes scenario backtest`. Its option
 marks are synthetic and its USD margin model is simplified; outputs do not
 represent historical option execution or exchange-margin fidelity.
 
-The exact OKX mapping and real-data acceptance remain blocked until a
-representative CSV or Parquet file and its source metadata are supplied.
+The reviewed OKX REST candle mapping and reproducible integration evidence are
+documented in [`docs/research/okx_1m_integration_evidence.md`](../docs/research/okx_1m_integration_evidence.md).
+`load_okx_history_candles(...)` additionally enforces the exact source schema,
+SHA256 identity and `confirm=1` for every candle.
+
+The complete setup, dataset, run, reconciliation and strategy-validation
+workflow is documented in
+[`docs/guides/run_backtest_and_validate_strategy.md`](../docs/guides/run_backtest_and_validate_strategy.md).

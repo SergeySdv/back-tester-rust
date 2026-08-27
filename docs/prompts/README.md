@@ -1,82 +1,82 @@
 # Agent prompts
 
-Эта папка содержит готовые промты для последовательной реализации epic и
-feature несколькими специализированными агентами.
+This folder contains reusable instructions for sequential epic/feature
+implementation by specialized agents.
 
-## Файлы
+## Files
 
-- [`master_agent.md`](master_agent.md) — менеджер процесса и владелец итогового
-  решения;
-- [`developer_agent.md`](developer_agent.md) — реализация production code и
-  необходимых developer tests;
-- [`qa_agent.md`](qa_agent.md) — независимая проверка, расширение тестов и
-  измерение coverage;
-- [`reviewer_agent.md`](reviewer_agent.md) — read-only review соответствия epic,
-  архитектуре и качеству реализации.
+- [`master_agent.md`](master_agent.md) — process manager and owner of the final
+  decision;
+- [`developer_agent.md`](developer_agent.md) - implementation of production code and
+  required developer tests;
+- [`qa_agent.md`](qa_agent.md) - independent verification, expansion of tests and
+  measurement coverage;
+- [`reviewer_agent.md`](reviewer_agent.md) — read-only review of epic compliance,
+  architecture and implementation quality.
 
-Все роли обязаны соблюдать корневой [`../../AGENTS.md`](../../AGENTS.md) и
-архитектурный контракт
+All roles are required to respect the root [`../../AGENTS.md`](../../AGENTS.md) and
+architectural contract
 [`../architecture/01_btc_24h_rust_python_mvp.md`](../architecture/01_btc_24h_rust_python_mvp.md).
-Порядок и канонические acceptance criteria находятся в
-[`../epics/README.md`](../epics/README.md); brief выбранного epic нельзя менять
-в течение цикла ради получения PASS.
+The order and canonical acceptance criteria are in
+[`../epics/README.md`](../epics/README.md); the selected epic's brief must not be
+changed during a cycle merely to obtain `PASS`.
 
-## Один цикл работы
+## One cycle of work
 
-Одна итерация — это полный последовательный цикл:
+One iteration is a complete sequential cycle:
 
 ```text
-master фиксирует brief и номер итерации
-  -> developer реализует и возвращает mini-report
-  -> QA запускает проверки, добавляет тесты и возвращает mini-report
-  -> reviewer делает независимый review и возвращает findings
-  -> master принимает результат или формирует следующий defect brief
+master captures brief and iteration number
+-> developer implements and returns mini-report
+-> QA runs checks, adds tests and returns a mini-report
+-> reviewer does an independent review and returns findings
+-> master accepts the result or generates the next defect brief
 ```
 
-Агенты не работают параллельно в одном working tree. Manager запускает
-следующую роль только после завершения предыдущей.
+Agents must not work concurrently in one working tree. The manager launches
+the next role only after the previous role completes.
 
-Для одного epic разрешено не более трёх полных итераций. После третьей
-итерации manager обязан завершить процесс статусом `ACCEPTED` либо
-`BLOCKED_AFTER_3_ITERATIONS`; четвёртый цикл без нового решения пользователя
-запрещён.
+No more than three full iterations are allowed for one epic. After the third
+iteration, the manager must end the process with `ACCEPTED` or
+`BLOCKED_AFTER_3_ITERATIONS`; a fourth cycle is prohibited without a new user
+decision.
 
-## Условия успешной приёмки
+## Conditions for successful acceptance
 
-Epic принимается только одновременно при следующих условиях:
+An epic is accepted only when all of the following conditions hold:
 
-- developer сообщил `DONE` и предоставил проверяемый diff;
-- QA сообщил `PASS`;
-- reviewer сообщил `APPROVED`;
-- все acceptance criteria epic имеют evidence;
-- обязательные команды завершились успешно;
-- coverage соответствует порогам;
-- отсутствуют нерешённые `BLOCKER` и `HIGH` findings.
+- developer reported `DONE` and provided a verifiable diff;
+- QA reported `PASS`;
+- reviewer reported `APPROVED`;
+- every epic acceptance criterion has evidence;
+- required commands completed successfully;
+- coverage corresponds to thresholds;
+- there are no unresolved `BLOCKER` and `HIGH` findings.
 
 ## Coverage policy
 
-Для финансового детерминированного ядра высокое покрытие достижимо и оправдано:
+For a financial deterministic core, high coverage is achievable and justified:
 
-| Область | Line coverage | Branch coverage |
+| Area | Line coverage | Branch coverage |
 |---|---:|---:|
-| Rust core | не ниже 90% | не ниже 85% |
-| Python orchestration/reporting | не ниже 85% | не ниже 80% |
-| Новый/изменённый executable code | не ниже 90% | измерять при поддержке diff coverage |
+| Rust core | at least 90% | at least 85% |
+| Python orchestration/reporting | at least 85% | at least 80% |
+| New/changed executable code | at least 90% | measure when diff coverage is supported |
 
-Кроме процентов обязательны requirement-based tests для Black–Scholes,
-expiry, causality, IV shock, 70/30 sizing, margin, PnL и drawdown. Высокий
-coverage без проверки этих инвариантов не считается достаточным.
+In addition to percentages, requirement-based tests are mandatory for
+Black–Scholes, expiry, causality, IV shock, 70/30 sizing, margin, PnL, and drawdown. High
+coverage without checking these invariants is not considered sufficient.
 
-Инструменты зафиксированы архитектурой: `cargo-llvm-cov` для Rust line
-coverage, pinned nightly `cargo-llvm-cov --branch` для Rust branch coverage,
-`pytest-cov --cov-branch` для Python и `scripts/check_coverage.py` для итогового
-threshold gate. Фактическими считаются только сгенерированные JSON reports.
+Tools are fixed by architecture: `cargo-llvm-cov` for Rust line
+coverage, pinned nightly `cargo-llvm-cov --branch` for Rust branch coverage,
+`pytest-cov --cov-branch` for Python and `scripts/check_coverage.py` for final
+threshold gate. Only generated JSON reports are considered actual.
 
 ## Mini-report contract
 
-Каждая роль завершает этап компактным структурированным отчётом. В нём должны
-быть номер итерации, status, base commit, файлы, выполненная работа, команды и
-их фактические результаты, coverage, найденные проблемы и следующий handoff.
+Each role completes its stage with a compact structured report containing the
+iteration number, status, base commit, files, completed work, commands and
+actual results, coverage, findings, and next handoff.
 
-Manager включает mini-reports или их точную сводку в итоговый отчёт, чтобы было
-видно, что произошло на каждой из максимум трёх итераций.
+The manager includes mini-reports or exact summaries in the final report so the
+history of each of the at most three iterations remains visible.

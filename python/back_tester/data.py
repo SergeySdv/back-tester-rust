@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 from typing import Union
 
@@ -15,6 +17,23 @@ from .config import DatasetMetadata
 MINUTE_NS = 60_000_000_000
 MIN_POINTS = 1_441
 TIMESTAMP_FACTORS = {"s": 1_000_000_000, "ms": 1_000_000, "us": 1_000, "ns": 1}
+OKX_HISTORY_CANDLES_COLUMNS = (
+    "timestamp_ms", "open", "high", "low", "close", "volume_contracts",
+    "volume_base", "volume_quote", "confirm",
+)
+_OKX_HISTORY_CANDLES_DTYPES = (
+    ("timestamp_ms", np.dtype("int64")),
+    ("open", np.dtype("float64")),
+    ("high", np.dtype("float64")),
+    ("low", np.dtype("float64")),
+    ("close", np.dtype("float64")),
+    ("volume_contracts", np.dtype("float64")),
+    ("volume_base", np.dtype("float64")),
+    ("volume_quote", np.dtype("float64")),
+    ("confirm", np.dtype("int64")),
+)
+OKX_HISTORY_CANDLES_SOURCE = "OKX public REST v5 GET /api/v5/market/history-candles"
+OKX_HISTORY_CANDLES_SYMBOL = "BTC-USDT-SWAP"
 
 
 @dataclass(frozen=True)
@@ -26,11 +45,45 @@ class ColumnMapping:
     timestamp_unit: str
 
 
+OKX_HISTORY_CANDLES_MAPPING = ColumnMapping("timestamp_ms", "close", "ms")
+
+
 @dataclass(frozen=True)
 class MinuteData:
     timestamps_ns: NDArray[np.int64]
     close: NDArray[np.float64]
     metadata: DatasetMetadata
+
+
+def load_okx_history_candles(
+    path: Union[str, Path], *, expected_sha256: str
+) -> MinuteData:
+    """Load the reviewed OKX REST candle schema and require completed rows."""
+    source_path = Path(path)
+    snapshot = _read_snapshot(source_path)
+    checksum = hashlib.sha256(snapshot).hexdigest()
+    if expected_sha256 != checksum:
+        raise ValueError(
+            f"dataset SHA256 mismatch: expected {expected_sha256}, got {checksum}"
+        )
+    frame = _read_snapshot_frame(source_path, snapshot)
+    if tuple(frame.columns) != OKX_HISTORY_CANDLES_COLUMNS:
+        raise ValueError(
+            "OKX history-candles columns must exactly equal: "
+            + ", ".join(OKX_HISTORY_CANDLES_COLUMNS)
+        )
+    _require_frame_dtypes(frame, _OKX_HISTORY_CANDLES_DTYPES)
+    incomplete = np.flatnonzero(frame["confirm"].to_numpy(copy=False) != 1)
+    if incomplete.size:
+        raise ValueError(f"incomplete OKX candle at index {int(incomplete[0])}: confirm must equal 1")
+    metadata = DatasetMetadata(
+        dataset_id=f"okx-rest-v5:{OKX_HISTORY_CANDLES_SYMBOL}:1m:sha256:{checksum}",
+        source=OKX_HISTORY_CANDLES_SOURCE,
+        symbol=OKX_HISTORY_CANDLES_SYMBOL,
+        interval_seconds=60,
+        timezone="UTC",
+    )
+    return _minute_data(frame, mapping=OKX_HISTORY_CANDLES_MAPPING, metadata=metadata)
 
 
 def validate_run_arrays(
@@ -68,6 +121,12 @@ def load_minutes(
     _validate_mapping(mapping)
     _validate_metadata(metadata)
     frame = _read_frame(Path(path))
+    return _minute_data(frame, mapping=mapping, metadata=metadata)
+
+
+def _minute_data(
+    frame: pd.DataFrame, *, mapping: ColumnMapping, metadata: DatasetMetadata
+) -> MinuteData:
     missing = [
         column
         for column in (mapping.timestamp_column, mapping.close_column)
@@ -87,6 +146,19 @@ def load_minutes(
     return MinuteData(timestamps_ns=timestamps_ns, close=close, metadata=metadata)
 
 
+def _read_snapshot(path: Path) -> bytes:
+    return path.read_bytes()
+
+
+def _read_snapshot_frame(path: Path, snapshot: bytes) -> pd.DataFrame:
+    source = BytesIO(snapshot)
+    if path.suffix.lower() == ".csv":
+        return pd.read_csv(source)
+    if path.suffix.lower() in {".parquet", ".pq"}:
+        return pd.read_parquet(source)
+    raise ValueError("minute data path must end in .csv, .parquet, or .pq")
+
+
 def _require_array(value: object, name: str, dtype: np.dtype) -> None:
     if not isinstance(value, np.ndarray):
         raise TypeError(f"{name} must be a numpy.ndarray")
@@ -96,6 +168,14 @@ def _require_array(value: object, name: str, dtype: np.dtype) -> None:
         raise TypeError(f"{name} must have dtype {dtype.name}")
     if not value.flags.c_contiguous:
         raise ValueError(f"{name} must be C-contiguous")
+
+
+def _require_frame_dtypes(
+    frame: pd.DataFrame, requirements: tuple[tuple[str, np.dtype], ...]
+) -> None:
+    for column, dtype in requirements:
+        if frame[column].dtype != dtype:
+            raise TypeError(f"{column} must have dtype {dtype.name}")
 
 
 def _validate_mapping(mapping: ColumnMapping) -> None:
