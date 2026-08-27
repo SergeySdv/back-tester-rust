@@ -1,11 +1,13 @@
 # Architecture
 
-The adopted design for the first research MVP is documented in
+Start with the compact diagram pack in
+[`02_system_overview.md`](02_system_overview.md). The complete normative design
+for the first research MVP remains
 [`01_btc_24h_rust_python_mvp.md`](01_btc_24h_rust_python_mvp.md).
 
-The files under [`../source`](../source) preserve the original Homework 4
-assignment and diagram as reference material. They are not the implementation
-contract for this Rust project.
+The files under [`../archive`](../archive/README.md) preserve historical and
+future-research material. They are not the implementation contract for this
+Rust project.
 
 Repository-wide coding rules are defined in [`../../AGENTS.md`](../../AGENTS.md).
 The ordered immutable implementation briefs are indexed in

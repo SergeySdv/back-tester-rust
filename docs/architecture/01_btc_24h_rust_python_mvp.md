@@ -742,10 +742,11 @@ The implementation sequence is split into immutable briefs indexed in
 2. `EPIC-002` — deterministic lifecycle, accounting and result buffers;
 3. `EPIC-003` — Python boundary, reporting, OKX loader and real-data handoff.
 
-`EPIC-001` and `EPIC-002` require only synthetic fixtures. The generic boundary
-and reporting part of `EPIC-003` can also use synthetic fixtures, but its final
-OKX mapping and real-data acceptance criteria remain blocked until a
-representative file is supplied.
+`EPIC-001` and `EPIC-002` required only synthetic fixtures. The generic boundary
+and reporting portion of `EPIC-003` can also use synthetic fixtures. Its former
+real-data blocker is now resolved: the approved representative OKX
+history-candles CSV supplies source-backed mapping, data-quality identity, and
+reconciled scenario-run evidence for `E3-08..E3-10`.
 
 ### 14.2 Coverage tooling decision
 
@@ -911,7 +912,7 @@ not be excluded.
 ### Before coding
 
 - [ ] Read this document completely.
-- [ ] Read `docs/research/btc_24h_black_scholes_fit_gap.md`.
+- [ ] Read `docs/README.md` and `docs/architecture/02_system_overview.md`.
 - [ ] Read the current immutable brief under `docs/epics/`.
 - [ ] Inspect the current working tree and preserve unrelated user changes.
 - [ ] Record the starting commit, or explicitly record that the repository has

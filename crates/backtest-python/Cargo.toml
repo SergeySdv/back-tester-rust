@@ -14,4 +14,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 backtest-core = { path = "../backtest-core" }
+numpy.workspace = true
 pyo3.workspace = true

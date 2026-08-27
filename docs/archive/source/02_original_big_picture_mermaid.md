@@ -64,4 +64,4 @@ flowchart TB
 
 This C++-oriented diagram is retained only as source reference. The adopted
 Rust-core/Python-orchestration MVP and its intentionally smaller scope are
-documented under [`../architecture`](../architecture/).
+documented under [`../../architecture`](../../architecture/).

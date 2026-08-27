@@ -1,177 +1,188 @@
 # AGENTS.md
 
-## Назначение проекта
+## Purpose of the project
 
-Этот репозиторий предназначен для детерминированного исследования стратегии
-продажи синтетического 24-часового BTC ATM straddle на минутной истории
-BTCUSDT perpetual с OKX.
+This repository is intended for deterministic research of a strategy that
+sells a synthetic 24-hour BTC ATM straddle on OKX BTCUSDT perpetual minute
+history.
 
-Цель первого этапа — проверить гипотезу по PnL, equity, максимальной просадке и
-использованию margin. Это сценарный Black–Scholes backtest, а не историческое
-воспроизведение рынка опционов и не система live trading.
+The first-stage goal is to test the hypothesis in terms of PnL, equity, maximum
+drawdown, and margin usage. This is a scenario-based Black–Scholes backtest,
+not historical option-market replay or a live-trading system.
 
-## Обязательный порядок чтения
+## Mandatory reading order
 
-Перед изменением кода или документации агент обязан:
+Before changing code or documentation, the agent must:
 
-1. прочитать этот файл;
-2. прочитать `docs/architecture/01_btc_24h_rust_python_mvp.md`;
-3. прочитать `docs/research/btc_24h_black_scholes_fit_gap.md`;
-4. прочитать [`docs/epics/README.md`](docs/epics/README.md), канонический brief
-   текущего epic/feature и применимый prompt из `docs/prompts/`;
-5. проверить реальное состояние кода, тестов, конфигурации и Git working tree.
+1. read this file;
+2. read the compact [`docs/README.md`](docs/README.md) index and
+   [`docs/architecture/02_system_overview.md`](docs/architecture/02_system_overview.md);
+3. read `docs/architecture/01_btc_24h_rust_python_mvp.md`;
+4. read the canonical input-data contract
+   [`docs/data/okx_btcusdt_swap_1m.md`](docs/data/okx_btcusdt_swap_1m.md);
+5. read [`docs/epics/README.md`](docs/epics/README.md), the canonical brief for
+   the current epic/feature, and the applicable prompt under `docs/prompts/`;
+6. check the actual state of the code, tests, configuration and Git working tree.
 
-`docs/source/` содержит исторические исходные требования и диаграмму. Это
-справочный материал, а не актуальный контракт Rust-реализации.
+`docs/archive/` contains historical requirements, superseded analysis, and
+future research. It is reference material, not the active Rust implementation
+contract.
 
-## Архитектурные границы
+## Architectural boundaries
 
 ### Rust core
 
-Rust отвечает за:
+Rust is responsible for:
 
-- Black–Scholes и payoff на expiry;
-- валидацию числовых входов native boundary;
-- причинный minute-by-minute lifecycle;
-- IV-сценарии и 70/30 reserve rule;
-- позиции, cash, option liability, locked/available margin;
-- equity, PnL, drawdown и детерминированный result contract.
+- Black–Scholes and payoff on expiry;
+- validation of numerical inputs at the native boundary;
+- causal minute-by-minute lifecycle;
+- IV scenarios and 70/30 reserve rule;
+- positions, cash, option liability, locked/available margin;
+- equity, PnL, drawdown and deterministic result contract.
 
-`backtest-core` не должен зависеть от Python, pandas или exchange SDK.
+`backtest-core` must not depend on Python, pandas, or exchange SDKs.
 
 ### Python orchestration
 
-Python отвечает за:
+Python is responsible for:
 
-- загрузку и отображение схемы CSV/Parquet;
-- подготовку contiguous arrays;
-- пользовательскую конфигурацию и запуск сценария;
-- один bulk-вызов Rust на backtest;
-- pandas/reporting и будущую интеграцию с универсальным exchange API.
+- loading and displaying CSV/Parquet schema;
+- preparation of contiguous arrays;
+- user configuration and scenario launch;
+- one bulk Rust call to backtest;
+- pandas/reporting and future integration with the universal exchange API.
 
-Запрещён Python callback на каждой минуте backtest.
+Per-minute Python callbacks during a backtest are prohibited.
 
-## Неизменяемые правила модели MVP
+## Immutable rules of the MVP model
 
-- Underlying — минутный close BTCUSDT perpetual.
-- Опцион синтетический: European call плюс put, обе позиции short.
-- Expiry наступает ровно через 24 часа elapsed time.
-- `K = S_entry`; ATM гарантирован только при первоначальном входе.
-- Strike и expiry reserve-транша совпадают с первоначальными.
-- Black–Scholes принимает конечные настраиваемые `r` и `q`; baseline использует
-  явные defaults `r=0`, `q=0`, но pricing не имеет права hard-code эти нули.
-- IV задаётся как annualized decimal; baseline постоянный, стресс после входа
-  полностью переоценивает обе ноги при `2x` или `3x` IV.
-- Публичный набор сценариев — непустое уникальное подмножество только
-  `baseline`, `stress_2x`, `stress_3x` в каноническом порядке.
-- Линейная vega-аппроксимация не заменяет полный Black–Scholes repricing.
-- 70% и 30% — бюджеты margin, а не premium и не notional.
-- Reserve-trigger срабатывает не более одного раза при
+- Underlying — minute close BTCUSDT perpetual.
+- Synthetic option: European call plus put, both positions short.
+- Expiry occurs exactly after 24 hours elapsed time.
+- `K = S_entry`; ATM is guaranteed only at initial entry.
+- Strike and expiry reserve tranches coincide with the initial ones.
+- Black–Scholes accepts finite configurable `r` and `q`; the baseline uses
+  explicit defaults `r=0`, `q=0`, but pricing must not hard-code these zeros.
+- IV is set as annualized decimal; baseline constant, stress after entry
+  fully reprices both legs at `2x` or `3x` IV.
+- The public scenario set is a non-empty unique subset of only
+  `baseline`, `stress_2x`, `stress_3x` in canonical order.
+- Linear vega approximation does not replace full Black–Scholes repricing.
+- 70% and 30% are margin budgets, not premium and not notional.
+- The reserve trigger fires no more than once when
   `current_iv >= 1.5 * entry_iv`.
-- Размер reserve ограничивается фактически доступным margin после изменения
-  equity; уменьшение или отказ должны быть видны в результате.
-- Сделки 24h не перекрываются в MVP.
-- На общей суточной границе порядок один: settlement старой сделки, realized
-  PnL и release margin, затем entry новой сделки, затем одна post-event row.
-- `1.0` quantity — call плюс put на один BTC; внутри quantity хранится целым
-  числом шагов, а не накапливаемым `f64`.
-- Запрещены look-ahead, скрытое исправление данных и недетерминированные
-  решения.
-- Accounting ведётся в model USD и не заявляет точного соответствия margin
-  конкретной биржи.
+- Reserve size is limited by margin actually available after the equity change;
+  reduction or rejection must be visible in the result.
+- 24h trades do not overlap in MVP.
+- At a shared daily boundary the order is fixed: settle the old trade, realize
+  PnL and release margin, enter the new trade, then emit one post-event row.
+- `1.0` quantity means a call plus a put on one BTC; internally quantity is
+  stored as an integer number of steps, not accumulated `f64`.
+- Look-ahead, hidden data repair, and nondeterministic decisions are prohibited.
+- Accounting uses model USD and does not claim exact conformity with any
+  exchange's margin rules.
 
-Изменение этих правил требует явного решения пользователя и обновления
-архитектурного документа до изменения реализации.
+Changing these rules requires an explicit user decision and an update to the
+architecture document before implementation changes.
 
-## Правила проектирования и кода
+## Design and code rules
 
 ### Correctness first
 
-- Финансовая и временная корректность важнее микрооптимизаций.
-- Формулы, единицы, timezone, currency и момент события должны быть явными.
-- Сначала фиксируй инварианты и тестовые примеры, затем оптимизируй hot path.
-- Не выдавай синтетическую option mark за реальную bid/ask, сделку или fill.
+- Financial and time correctness are more important than micro-optimizations.
+- Formulas, units, timezone, currency and the moment of the event must be explicit.
+- First fix invariants and test cases, then optimize the hot path.
+- Do not pass off a synthetic option mark as a real bid/ask, deal or fill.
 
 ### KISS
 
-- Выбирай самое простое решение, которое полностью выполняет acceptance
+- Choose the simplest solution that fully fulfills acceptance
   criteria.
-- Предпочитай явные типы и небольшие функции скрытой магии и сложным framework.
-- Не добавляй distributed services, plugin system, database или async runtime,
-  пока epic этого явно не требует.
+- Prefer explicit types and small functions over hidden magic and complex frameworks.
+- Do not add distributed services, a plugin system, a database, or an async
+  runtime unless the epic explicitly requires it.
 
 ### YAGNI
 
-- Не реализуй будущие exchange connectors, historical option replay, IV
-  surface, order book, liquidation engine или live trading заранее.
-- Не добавляй configuration knobs без текущего сценария использования.
-- Не создавай универсальную абстракцию ради единственной реализации.
+- Do not implement future exchange connectors, historical option replay, IV
+  surface, order book, liquidation engine or live trading in advance.
+- Do not add configuration knobs without the current usage scenario.
+- Do not create a universal abstraction for a single implementation.
 
 ### DRY
 
-- Не дублируй формулы, validation rules и accounting transitions.
-- Общая логика должна иметь один источник истины и отдельные тесты.
-- DRY не оправдывает преждевременную абстракцию: небольшое очевидное повторение
-  лучше неверной общей модели.
+- Do not duplicate formulas, validation rules and accounting transitions.
+- Shared logic must have one source of truth and dedicated tests.
+- DRY does not justify premature abstraction: a small amount of obvious
+  repetition is better than an incorrect general model.
 
 ### Separation of concerns
 
-- Pricing, strategy state, portfolio accounting, margin, data loading и
-  reporting должны оставаться отдельными ответственностями.
-- Domain core не должен импортировать orchestration или presentation layers.
-- Используй dependency inversion только на реальной внешней границе.
+- Pricing, strategy state, portfolio accounting, margin, data loading, and
+  reporting must remain separate responsibilities.
+- The domain core must not import orchestration or presentation layers.
+- Use dependency inversion only on the real external boundary.
 
 ## Rust rules
 
-- Используй типизированные ошибки для некорректных данных; не делай `panic!`,
-  `unwrap()` или `expect()` на пользовательском пути.
-- Проверяй все floating-point inputs на `is_finite()` и допустимый диапазон.
-- Не сравнивай вычисленные `f64` на точное равенство без математического
-  обоснования; tolerance должен быть именован и протестирован.
-- Избегай `unsafe`; если без него нельзя, документируй инварианты и добавляй
-  узкие тесты.
-- Публичные типы и ошибки должны быть стабильными и осмысленными.
-- Избегай аллокаций и динамической диспетчеризации в minute loop без измеренной
-  необходимости.
-- Код должен проходить formatting, Clippy с warnings-as-errors и все тесты.
+- Use typed errors for invalid data; do not use `panic!`,
+  `unwrap()`, or `expect()` on a user-facing path.
+- Check all floating-point inputs for `is_finite()` and the acceptable range.
+- Do not compare a calculated `f64` for exact equality without mathematical
+  justification; tolerance must be named and tested.
+- Avoid `unsafe`; if you can’t do without it, document the invariants and add
+  narrow tests.
+- Public types and errors must be stable and meaningful.
+- Avoid allocations and dynamic dispatch in the minute loop without a measured
+  necessity.
+- The code must pass formatting, Clippy with warnings-as-errors and all tests.
 
 ## Python rules
 
-- Python-слой остаётся тонким, типизированным и ориентированным на bulk I/O.
-- Не выполняй финансовую state machine второй раз в Python.
-- Проверяй schema, dtype, timezone, монотонность и contiguous layout до native
-  вызова; Rust повторно защищает числовую границу.
-- Не подавляй native exceptions и не возвращай частичный результат как успех.
-- Не добавляй dependency без доказанной необходимости.
-- Публичные функции должны иметь type hints и понятные ошибки.
+- The Python layer remains thin, typed, and bulk I/O oriented.
+- Do not implement the financial state machine a second time in Python.
+- Check schema, dtype, timezone, monotonicity, and contiguous layout before the
+  native call; Rust validates the numeric boundary again.
+- Do not suppress native exceptions or return partial results as success.
+- Do not add a dependency unless its necessity is established.
+- Public functions must have type hints and clear errors.
 
 ## Data and determinism
 
-- Источник, symbol, interval, timezone и dataset ID должны сохраняться в
-  metadata результата.
-- Gaps, duplicates, out-of-order timestamps, NaN, infinity и неположительные
-  цены отклоняются явно.
-- Не сортируй, forward-fill и не ремонтируй вход молча.
-- Время до expiry выводится из timestamps, а не только из номера строки.
-- Одинаковый input и config должны давать побитово одинаковые result arrays,
-  кроме заранее документированного ограничения платформы.
-- Если появляется randomness, seed становится обязательной частью config и
-  результата.
+The canonical approved OKX minute-input format, mapping rules, and raw-trade
+boundary are defined in
+[`docs/data/okx_btcusdt_swap_1m.md`](docs/data/okx_btcusdt_swap_1m.md).
 
-## Тестирование и quality gates
+- Source, symbol, interval, timezone and dataset ID must be stored in
+  result metadata.
+- Gaps, duplicates, out-of-order timestamps, NaN, infinity and non-positive
+  prices are explicitly rejected.
+- Do not sort, forward-fill or repair the input silently.
+- Time to expiry is derived from timestamps, not merely from a row number.
+- The same input and config must give bitwise identical result arrays,
+  other than a pre-documented platform limitation.
+- If randomness appears, the seed becomes a required part of the config and
+  result.
 
-Процент покрытия — минимальный индикатор, а не замена проверке требований.
+## Testing and quality gates
 
-- Rust core: line coverage не ниже 90%, branch coverage не ниже 85%.
-- Python orchestration/reporting: line coverage не ниже 85%, branch coverage не
-  ниже 80%.
-- Изменённый исполняемый код: line coverage не ниже 90%, если diff coverage
-  поддерживается инструментами проекта.
-- Для pricing, time causality, 70/30 sizing, margin ledger, settlement, PnL и
-  drawdown должны существовать тесты каждого acceptance rule и граничного
-  состояния независимо от итогового процента.
+The practical procedure for installation, adding data, running a backtest, and
+checking the trading hypothesis is described in
+[`docs/guides/run_backtest_and_validate_strategy.md`](docs/guides/run_backtest_and_validate_strategy.md).
 
-Минимальные проверки, когда соответствующие части проекта существуют:
+Coverage percentage is a minimum indicator, not a substitute for verifying requirements.
+
+- Rust core: line coverage at least 90%, branch coverage at least 85%.
+- Python orchestration/reporting: line coverage at least 85%, branch coverage at
+  least 80%.
+- Changed executable code: line coverage at least 90% if diff coverage is
+  supported by project tools.
+- For pricing, time causality, 70/30 sizing, margin ledger, settlement, PnL and
+  drawdown, there must be tests for each acceptance rule and boundary
+  condition regardless of the final percentage.
+
+Minimum checks when relevant parts of the project exist:
 
 ```bash
 cargo fmt --all -- --check
@@ -180,50 +191,52 @@ cargo test --workspace --all-features
 pytest
 ```
 
-Coverage policy использует `cargo-llvm-cov` для Rust lines, отдельный pinned
-nightly `cargo-llvm-cov --branch` job для Rust branches, `pytest-cov` с
-`--cov-branch` для Python и `scripts/check_coverage.py` как единый threshold
-gate. Канонические команды находятся в разделе 14.2 архитектурного документа;
-tool versions и nightly фиксируются scaffold epic в репозитории. Исключения из
-coverage допускаются только по reviewed path rule с обоснованием. Агент не
-имеет права придумывать процент, если JSON report не был реально сгенерирован.
+Coverage policy uses `cargo-llvm-cov` for Rust lines, separate pinned
+nightly `cargo-llvm-cov --branch` job for Rust branches, `pytest-cov` with
+`--cov-branch` for Python and `scripts/check_coverage.py` as a single threshold
+gate. The canonical commands are in section 14.2 of the architecture document;
+tool versions and the nightly toolchain are pinned in the repository by the scaffold
+epic. Coverage exclusions are allowed only through a reviewed path rule with
+justification. An agent must not invent a percentage if the JSON report was not
+actually generated.
 
-## Git и рабочее дерево
+## Git and the working tree
 
-- До работы зафиксируй branch, base commit и исходный `git status`.
-- Сохраняй несвязанные изменения пользователя.
-- Не используй destructive Git-команды без прямого разрешения.
-- Не коммить `.codex/`, `.idea/`, secrets, credentials, datasets и временные
+- Before work, record the branch, base commit, and initial `git status`.
+- Preserve unrelated user changes.
+- Do not use destructive Git commands without express permission.
+- Do not commit `.codex/`, `.idea/`, secrets, credentials, datasets and temporary
   build/cache artifacts.
-- Commit и push выполняются только по явному запросу пользователя или epic.
-- Перед handoff проверь diff, untracked files и реальные результаты команд.
+- Commit and push are performed only when explicitly requested by the user or epic.
+- Before handoff, check diff, untracked files and real command results.
 
-## Агентный workflow
+## Agent workflow
 
-Для epic/feature используй последовательный процесс из
+For an epic/feature, use the sequential process from
 [`docs/prompts/README.md`](docs/prompts/README.md):
 
-1. master-agent выбирает канонический immutable epic brief и фиксирует base
-   commit, user-owned changes и iteration context, не меняя его criteria;
-2. developer реализует и пишет mini-report;
-3. QA проверяет качество, тесты и coverage и пишет mini-report;
-4. reviewer независимо проверяет соответствие epic и пишет findings;
-5. master принимает результат или начинает следующую итерацию.
+1. the master agent selects the canonical immutable epic brief and records the
+   base commit, user-owned changes, and iteration context without changing its
+   criteria;
+2. developer implements and writes a mini-report;
+3. QA checks quality, tests and coverage and writes a mini-report;
+4. reviewer independently checks compliance with epic and writes findings;
+5. master accepts the result or begins the next iteration.
 
-Одновременно изменять одно рабочее дерево несколькими агентами запрещено.
-Максимум — три полных итерации `developer → QA → reviewer` на один epic.
+It is prohibited for multiple agents to modify the same work tree at the same time.
+At most three full `developer → QA → reviewer` iterations are allowed per epic.
 
-## Требования к handoff
+## Requirements for handoff
 
-Каждый исполнитель сообщает:
+Each performer reports:
 
-- задачу и номер итерации;
-- base commit и изменённые файлы;
-- фактически реализованное поведение;
-- связь с acceptance criteria;
-- точные команды и фактические результаты проверок;
-- coverage или честное `not measured`;
-- допущения, риски, blockers и следующий рекомендуемый шаг.
+- task and iteration number;
+- base commit and changed files;
+- actually implemented behavior;
+- connection with acceptance criteria;
+- exact commands and actual test results;
+- coverage or honest `not measured`;
+- assumptions, risks, blockers and the next recommended step.
 
-Нельзя писать «готово», «все тесты прошли» или «соответствует epic» без
-проверяемых evidence из текущего working tree.
+Do not write “done,” “all tests passed,” or “meets epic” without
+verifiable evidence from the current working tree.

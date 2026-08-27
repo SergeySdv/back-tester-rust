@@ -1,3 +1,6 @@
+mod run;
+mod serialize;
+
 use backtest_core::{DomainError, black_scholes_many};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -31,5 +34,6 @@ fn price_many(
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(price_many, module)?)?;
+    module.add_function(wrap_pyfunction!(run::run_backtest_native, module)?)?;
     Ok(())
 }

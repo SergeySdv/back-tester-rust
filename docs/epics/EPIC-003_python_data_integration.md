@@ -1,74 +1,82 @@
 # EPIC-003: Python boundary, data integration and reporting
 
-- Статус: `PARTIALLY_READY`
-- Версия brief: `1.0`
-- Зависимость: `EPIC-002` принят
-- Внешний blocker: representative OKX CSV/Parquet для `E3-08..E3-10`
+- Status: `ACCEPTED`
+- Brief version: `1.0`
+- Dependency: `EPIC-002` accepted
+- External blocker: resolved; an approved representative OKX CSV supplies
+  evidence for `E3-08..E3-10`
 
-## Результат
+## Result
 
-Python загружает и валидирует minute data, одним bulk-вызовом запускает Rust
-scenarios и предоставляет стабильные pandas tables и metadata. На реальном
-OKX sample документируется точный mapping и выполняется auditable
-baseline/2x/3x scenario run.
+Python loads and validates minute data, launches scenarios in Rust through one
+bulk call, and provides stable pandas tables and metadata. A real OKX sample has
+an exact documented mapping and produces an auditable baseline/2x/3x scenario
+run.
 
 ## In scope
 
-- typed Python config, dataset metadata и fixed scenario API;
-- contiguous NumPy input и один PyO3 call без per-minute callback;
-- перевод Rust buffers/validity masks в pandas с контрактными dtypes/order;
-- CSV/Parquet loader с явным, source-backed mapping;
-- сохранение run config, model ID/version и dataset identity;
-- synthetic end-to-end tests и real-data data-quality/run handoff;
-- минимальные comparison tables/export, необходимые для PnL/drawdown review.
+- typed Python config, dataset metadata and fixed scenario API;
+- contiguous NumPy input and one PyO3 call without per-minute callback;
+- translation of Rust buffers/validity masks into pandas with contract dtypes/order;
+- CSV/Parquet loader with explicit, source-backed mapping;
+- saving run config, model ID/version and dataset identity;
+- synthetic end-to-end tests and real-data data-quality/run handoff;
+- minimum comparison tables/export required for PnL/drawdown review.
 
 ## Out of scope
 
-- дублирование pricing/state machine в Python;
-- угадывание OKX schema по filename;
-- download service, exchange connector, live orders и credentials;
-- исторические option quotes/IV, dashboard и generic plugin framework.
+- duplication of pricing/state machine in Python;
+- guessing OKX schema by filename;
+- download service, exchange connector, live orders and credentials;
+- historical option quotes/IV, dashboard and generic plugin framework.
 
 ## Acceptance criteria
 
-- `E3-01`: публичный Python API принимает contiguous `int64 timestamps_ns`,
-  `float64 close`, `DatasetMetadata`, config и fixed scenarios одним run call.
-- `E3-02`: dtype/length/contiguity errors и native typed errors становятся
-  actionable Python exceptions без partial result.
-- `E3-03`: equity, trades, tranches, reserve attempts и summary DataFrames имеют
-  точные column order/dtypes/nullability; nulls не представлены NaN/negative-ID
+- `E3-01`: public Python API accepts contiguous `int64 timestamps_ns`,
+  `float64 close`, `DatasetMetadata`, config and fixed scenarios with one run call.
+- `E3-02`: dtype/length/contiguity errors and native typed errors become
+  actionable Python exceptions without partial result.
+- `E3-03`: equity, trades, tranches, reserve attempts and summary DataFrames have
+  exact column order/dtypes/nullability; nulls are not represented by NaN/negative-ID
   sentinels.
-- `E3-04`: scenario/table ordering и результаты повторного вызова
-  детерминированы; Python не пересчитывает финансовую state machine.
-- `E3-05`: synthetic end-to-end test на 2,881 points завершает две сделки и
-  сверяет table counts, final equity, PnL, margin и metadata с native result.
-- `E3-06`: loader отклоняет missing columns, invalid dtype/unit/timezone,
-  gaps/duplicates/disorder, NaN/infinity и non-positive close; он не сортирует,
-  fill и не исправляет данные молча.
-- `E3-07`: каждый output маркирован как
-  `synthetic Black–Scholes scenario backtest` и не заявляет историческое
-  option execution или exchange-margin fidelity.
-- `E3-08`: из representative OKX sample документированы exact source, symbol,
-  interval, timezone, timestamp unit, price column, coverage и mapping; эти
-  значения не выводятся из непроверенного filename.
-- `E3-09`: approved sample проходит data-quality checks; его dataset ID и
-  checksum/identity сохраняются с результатом.
-- `E3-10`: baseline, 2x и 3x run на approved sample создаёт auditable PnL,
-  drawdown, margin and reserve outputs, а summary reconciliation проходит.
-- `E3-11`: format/lint/tests и Rust/Python coverage gates проходят; packaging
-  воспроизводится из clean project environment.
+- `E3-04`: scenario/table ordering and repeated-call results are deterministic;
+  Python does not recalculate the financial state machine.
+- `E3-05`: synthetic end-to-end test at 2,881 points completes two trades and
+  checks table counts, final equity, PnL, margin and metadata with native result.
+- `E3-06`: the loader rejects missing columns, invalid dtype/unit/timezone,
+  gaps/duplicates/out-of-order data, NaN/infinity, and non-positive close; it
+  does not sort, fill, or silently repair the data.
+- `E3-07`: each output is marked as
+  `synthetic Black–Scholes scenario backtest` and does not claim historical
+  option execution or exchange-margin fidelity.
+- `E3-08`: the representative OKX sample documents the exact source, symbol,
+  interval, timezone, timestamp unit, price column, coverage, and mapping; these
+  values are not inferred from unchecked filename.
+- `E3-09`: approved sample passes data-quality checks; its dataset ID and
+  checksum/identity are saved with the result.
+- `E3-10`: baseline, 2x, and 3x runs on the approved sample create auditable PnL,
+  drawdown, margin, and reserve outputs, and the summaries reconcile.
+- `E3-11`: format/lint/tests and Rust/Python coverage gates pass; packaging
+  reproduced from clean project environment.
 
-## Правило внешнего blocker
+## External blocker rule and resolution
 
-Работу можно принять отдельной feature до `E3-07` на synthetic fixtures. Весь
-`EPIC-003` и полный MVP нельзя принять без `E3-08..E3-10`. Отсутствие sample не
-разрешает подставить предполагаемые названия колонок, timestamp units, symbol
-или timezone; manager возвращает `BLOCKED_EXTERNAL` только для real-data части.
+Work through `E3-07` may be accepted as a separate synthetic-fixture feature. Full
+`EPIC-003` and the full MVP cannot be accepted without `E3-08..E3-10`. The absence
+of a sample does not permit inventing expected column names, timestamp units, symbol,
+or timezone; manager returns `BLOCKED_EXTERNAL` only for the real-data part.
+
+That historical blocker is now resolved. The approved representative OKX
+history-candles sample has a source-backed schema, mapping, checksum-derived
+dataset identity, strict data-quality evidence, and reconciled baseline/2x/3x
+run evidence for `E3-08..E3-10`. Epic acceptance still requires the normal
+developer, QA, and reviewer gates; resolving the external blocker does not by
+itself declare the epic accepted.
 
 ## Required handoff evidence
 
-- exact install/build/test/coverage commands и версии environment;
-- schema/dtype assertions и synthetic E2E results;
-- после получения sample: mapping document, data-quality summary, dataset
-  identity и reconciled scenario summaries;
-- явный список ограничений scenario model перед любым решением о live stage.
+- exact install/build/test/coverage commands and environment versions;
+- schema/dtype assertions and synthetic E2E results;
+- after receiving sample: mapping document, data-quality summary, dataset
+  identity and reconciled scenario summaries;
+- an explicit list of scenario-model limitations before any decision about a live stage.
