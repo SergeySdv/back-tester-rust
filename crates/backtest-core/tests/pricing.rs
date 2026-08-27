@@ -116,114 +116,68 @@ fn extreme_finite_rounding_tail_is_nonnegative() {
 
 #[test]
 fn invalid_pricing_inputs_return_typed_errors() {
-    let invalid = [
-        (
-            0.0,
-            100.0,
-            1.0,
-            0.2,
-            0.0,
-            0.0,
-            "spot",
-            InvalidValue::MustBePositive,
-        ),
-        (
-            100.0,
-            -1.0,
-            1.0,
-            0.2,
-            0.0,
-            0.0,
-            "strike",
-            InvalidValue::MustBePositive,
-        ),
-        (
-            100.0,
-            100.0,
-            -0.1,
-            0.2,
-            0.0,
-            0.0,
-            "time_years",
-            InvalidValue::MustBeNonNegative,
-        ),
-        (
-            100.0,
-            100.0,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            "sigma",
-            InvalidValue::MustBePositive,
-        ),
-        (
-            f64::NAN,
-            100.0,
-            1.0,
-            0.2,
-            0.0,
-            0.0,
-            "spot",
-            InvalidValue::NotFinite,
-        ),
-        (
-            100.0,
-            f64::INFINITY,
-            1.0,
-            0.2,
-            0.0,
-            0.0,
-            "strike",
-            InvalidValue::NotFinite,
-        ),
-        (
-            100.0,
-            100.0,
-            f64::NAN,
-            0.2,
-            0.0,
-            0.0,
-            "time_years",
-            InvalidValue::NotFinite,
-        ),
-        (
-            100.0,
-            100.0,
-            1.0,
-            f64::NAN,
-            0.0,
-            0.0,
-            "sigma",
-            InvalidValue::NotFinite,
-        ),
-        (
-            100.0,
-            100.0,
-            1.0,
-            0.2,
-            f64::INFINITY,
-            0.0,
-            "risk_free_rate",
-            InvalidValue::NotFinite,
-        ),
-        (
-            100.0,
-            100.0,
-            1.0,
-            0.2,
-            0.0,
-            f64::NEG_INFINITY,
-            "carry_rate",
-            InvalidValue::NotFinite,
-        ),
-    ];
-    for (spot, strike, time, sigma, rate, carry, field, reason) in invalid {
-        assert_eq!(
-            black_scholes(spot, strike, time, sigma, rate, carry),
-            Err(DomainError::InvalidField { field, reason })
-        );
-    }
+    assert_invalid(
+        (0.0, 100.0, 1.0, 0.2, 0.0, 0.0),
+        "spot",
+        InvalidValue::MustBePositive,
+    );
+    assert_invalid(
+        (100.0, -1.0, 1.0, 0.2, 0.0, 0.0),
+        "strike",
+        InvalidValue::MustBePositive,
+    );
+    assert_invalid(
+        (100.0, 100.0, -0.1, 0.2, 0.0, 0.0),
+        "time_years",
+        InvalidValue::MustBeNonNegative,
+    );
+    assert_invalid(
+        (100.0, 100.0, 1.0, 0.0, 0.0, 0.0),
+        "sigma",
+        InvalidValue::MustBePositive,
+    );
+    assert_invalid(
+        (f64::NAN, 100.0, 1.0, 0.2, 0.0, 0.0),
+        "spot",
+        InvalidValue::NotFinite,
+    );
+    assert_invalid(
+        (100.0, f64::INFINITY, 1.0, 0.2, 0.0, 0.0),
+        "strike",
+        InvalidValue::NotFinite,
+    );
+    assert_invalid(
+        (100.0, 100.0, f64::NAN, 0.2, 0.0, 0.0),
+        "time_years",
+        InvalidValue::NotFinite,
+    );
+    assert_invalid(
+        (100.0, 100.0, 1.0, f64::NAN, 0.0, 0.0),
+        "sigma",
+        InvalidValue::NotFinite,
+    );
+    assert_invalid(
+        (100.0, 100.0, 1.0, 0.2, f64::INFINITY, 0.0),
+        "risk_free_rate",
+        InvalidValue::NotFinite,
+    );
+    assert_invalid(
+        (100.0, 100.0, 1.0, 0.2, 0.0, f64::NEG_INFINITY),
+        "carry_rate",
+        InvalidValue::NotFinite,
+    );
+}
+
+fn assert_invalid(
+    input: (f64, f64, f64, f64, f64, f64),
+    field: &'static str,
+    reason: InvalidValue,
+) {
+    let (spot, strike, time, sigma, rate, carry) = input;
+    assert_eq!(
+        black_scholes(spot, strike, time, sigma, rate, carry),
+        Err(DomainError::InvalidField { field, reason })
+    );
 }
 
 #[test]

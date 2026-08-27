@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 SCRIPT = Path(__file__).parents[2] / "scripts" / "check_coverage.py"
 
 

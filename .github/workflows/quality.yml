@@ -18,12 +18,13 @@ jobs:
       - run: rustup component add llvm-tools-preview rustfmt clippy
       - run: cargo install cargo-llvm-cov --version 0.9.0 --locked
       - run: uv sync --locked --group dev
+      - run: ./scripts/quality.sh
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-features
       - run: uv run maturin develop
       - run: uv run pytest
       - run: mkdir -p target/coverage
+      - run: cargo clean --target-dir target/llvm-cov-target
       - run: >-
           cargo llvm-cov --workspace --all-features
           --fail-under-lines 90
@@ -45,6 +46,7 @@ jobs:
       - run: rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
       - run: cargo install cargo-llvm-cov --version 0.9.0 --locked
       - run: mkdir -p target/coverage
+      - run: cargo clean --target-dir target/llvm-cov-target
       - run: >-
           cargo +nightly-2026-08-01 llvm-cov --workspace --all-features
           --branch --json --output-path target/coverage/rust-branches.json

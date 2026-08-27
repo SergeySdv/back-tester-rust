@@ -1,7 +1,6 @@
 import math
 
 import pytest
-
 from back_tester import price_many
 
 
