@@ -15,3 +15,5 @@ __pycache__/
 *.py[cod]
 build/
 dist/
+.coverage
+/python/back_tester/_native*.so

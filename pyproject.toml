@@ -1,0 +1,29 @@
+[build-system]
+requires = ["maturin==1.15.0"]
+build-backend = "maturin"
+
+[project]
+name = "back-tester"
+version = "0.1.0"
+requires-python = ">=3.9"
+description = "Synthetic Black-Scholes scenario backtester scaffold"
+
+[dependency-groups]
+dev = [
+    "maturin==1.15.0",
+    "pytest==8.4.2",
+    "pytest-cov==7.0.0",
+]
+
+[tool.maturin]
+manifest-path = "crates/backtest-python/Cargo.toml"
+python-source = "python"
+module-name = "back_tester._native"
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+addopts = "--strict-markers"
+
+[tool.coverage.run]
+branch = true
+source = ["back_tester"]

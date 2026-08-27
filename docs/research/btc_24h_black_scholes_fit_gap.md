@@ -15,6 +15,8 @@ Rust, а загрузка данных, запуск сценариев и от�
 
 Утверждённый implementation brief:
 [`../architecture/01_btc_24h_rust_python_mvp.md`](../architecture/01_btc_24h_rust_python_mvp.md).
+Канонические этапы реализации:
+[`../epics/README.md`](../epics/README.md).
 
 ## Что можно переиспользовать
 
@@ -36,6 +38,8 @@ runtime-зависимость и не прямое копирование C++:
 | Область | Статус | Следующий шаг |
 |---|---|---|
 | Rust workspace | Нет | Создать workspace и `backtest-core` |
+| Immutable epic briefs | Готово | Реализовывать последовательно EPIC-001..003 |
+| Coverage tooling contract | Готово в docs | Настроить и зафиксировать версии в EPIC-001 |
 | PyO3/maturin boundary | Нет | Создать отдельный binding crate |
 | OKX minute loader | Нет | Зафиксировать реальную CSV/Parquet-схему |
 | Black–Scholes | Нет | Реализовать call/put, expiry и тесты |
@@ -72,8 +76,27 @@ runtime-зависимость и не прямое копирование C++:
 - периодом покрытия;
 - политикой пропусков и дублей.
 
-До получения файла разработка может использовать только маленькие синтетические
-fixtures. Они валидируют расчёты, но не торговую гипотезу.
+Отсутствие файла блокирует только точный OKX loader mapping, data-quality audit
+реального набора и итоговый scenario run. Оно не блокирует scaffold, pricing,
+lifecycle, accounting и generic Python boundary на синтетических fixtures.
+Такие fixtures валидируют реализацию модели, но сами по себе не подтверждают
+торговую гипотезу.
+
+## Что исследовать перед выводом о гипотезе
+
+Это не блокирует `EPIC-001` и `EPIC-002`, но обязательно до содержательного
+решения по результатам real-data backtest:
+
+- получить representative OKX minute file и проверить фактическую схему,
+  timestamp units, timezone, gaps и symbol;
+- зафиксировать источник текущей IV, момент снимка, expiry/moneyness universe и
+  правило вычисления среднего `base_iv`;
+- обосновать диапазон `margin_per_straddle_usd` и прогнать sensitivity, не
+  называя упрощённую величину ГО Deribit/Bybit/Binance/OKX;
+- отдельно оценить влияние proxy `perpetual close` вместо spot/index/forward,
+  если synthetic MVP даст привлекательный результат;
+- собирать/покупать историю опционов только если этот сценарный этап оправдает
+  дополнительную точность и стоимость.
 
 ## Проверка этого изменения
 

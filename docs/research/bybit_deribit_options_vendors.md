@@ -10,6 +10,12 @@
 без проверяемого каталога помечено как неподтверждённое. Цены и каталоги могут
 измениться после указанной даты.
 
+> Атрибуция репозитория: упоминания ниже о существующем native replay cache,
+> multi-instrument L2 runtime и one-instrument manifest относятся к отдельному
+> репозиторию `back-tester-2026`, который исследовался ранее. В текущем
+> `back-tester-rust` такого runtime/manifest нет; его MVP — синтетический
+> сценарный бэктест из `docs/architecture/`.
+
 ## Короткий вывод
 
 1. **Лучший готовый self-service источник для обеих бирж — Tardis.dev.** Он
@@ -214,7 +220,7 @@ gap; `raw` требует авторизации. [Deribit book stream](https://
   -> sequence/gap validator + REST resnapshot
   -> deterministic normalizer
   -> Parquet + manifest/checksums
-  -> existing native replay cache adapter
+  -> native replay cache adapter из `back-tester-2026` или новый adapter
 ```
 
 Практический минимум — одна always-on VM в близком регионе, отдельный резервный
@@ -712,8 +718,9 @@ versioning. На дату проверки Bybit non-VIP options maker/taker у�
 - margin state не выводится из premium, а рассчитывается по versioned rules или
   берётся из account-risk observation.
 
-Проектный runtime сейчас умеет deterministic multi-instrument L2 replay, но не
-умеет option expiry, Greeks, multi-leg atomicity и margin. Поэтому покупка данных
-решает source problem, но всё равно требует versioned options adapter и account
-risk engine; raw vendor rows нельзя без потерь втиснуть в текущий
-one-instrument integer-multiplier manifest.
+Исторический runtime в `back-tester-2026` умеет deterministic multi-instrument
+L2 replay, но не умеет option expiry, Greeks, multi-leg atomicity и margin. В
+`back-tester-rust` этого runtime нет. Поэтому покупка данных решает source
+problem, но для будущего historical-option replay всё равно потребуются
+versioned options adapter и account risk engine; raw vendor rows нельзя без
+потерь втиснуть в one-instrument integer-multiplier manifest старого проекта.

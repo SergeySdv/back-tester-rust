@@ -2,6 +2,12 @@
 
 Research date: 2026-08-25. Only first-party exchange documentation and first-party production endpoints were used.
 
+> Repository attribution: references below to an existing replay runtime,
+> canonical replay cache or one-instrument manifest describe the separate
+> `back-tester-2026` repository inspected during the original research. The
+> current `back-tester-rust` repository has no such runtime or manifest; its MVP
+> contract is the synthetic scenario model under `docs/architecture/`.
+
 ## Status vocabulary
 
 - **Verified** means the exchange explicitly documents the fact at a cited official URL.
@@ -257,7 +263,11 @@ sequence, previous_sequence, cross_sequence
 depth, aggregation_ms, is_rpi_excluded, is_gap
 ```
 
-For replay efficiency this event table can be converted into the project's canonical snapshots/trades and native replay cache, but the raw normalized delta stream should remain auditable. Venue quantity semantics must be converted through `instrument_version`; reject non-exact conversion.
+For replay efficiency this event table could be converted into the canonical
+snapshots/trades and native replay cache of `back-tester-2026`, but the raw
+normalized delta stream should remain auditable. This is not an available
+adapter in `back-tester-rust`. Venue quantity semantics must be converted
+through `instrument_version`; reject non-exact conversion.
 
 ### `option_trade`
 
@@ -325,7 +335,13 @@ completeness          enum {COMPLETE, PARTIAL, UNKNOWN}
 missing_intervals[]
 ```
 
-The existing project manifest is one-instrument and its hot path assumes exact integer quantities and quote currency equal to account currency. Option support needs a separate multi-instrument manifest/adapter or a versioned extension; silently squeezing inverse BTC-settled options into the current cash model would produce incorrect PnL and margin.
+Historical `back-tester-2026` note: that repository's manifest is
+one-instrument and its hot path assumes exact integer quantities and quote
+currency equal to account currency. It is not a component of
+`back-tester-rust`. A future historical-option replay would need a separate
+multi-instrument manifest/adapter or a versioned extension; silently squeezing
+inverse BTC-settled options into a linear cash model would produce incorrect
+PnL and margin.
 
 ## Pricing and backtest constraints
 

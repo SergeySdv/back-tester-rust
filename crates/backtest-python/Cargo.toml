@@ -1,0 +1,14 @@
+[package]
+name = "backtest-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+backtest-core = { path = "../backtest-core" }
+pyo3.workspace = true
