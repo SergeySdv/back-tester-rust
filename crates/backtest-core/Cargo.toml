@@ -4,6 +4,15 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+autotests = false
 
 [dependencies]
 libm.workspace = true
+
+[[test]]
+name = "suite"
+path = "tests/suite.rs"
+
+[[bench]]
+name = "million"
+harness = false
