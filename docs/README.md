@@ -17,6 +17,9 @@ source of truth; the overview diagrams do not replace them.
   handoffs.
 - [Operational guide](guides/run_backtest_and_validate_strategy.md) — local
   validation and reproducible sample run.
+- [Strategy research readiness roadmap](roadmap/strategy_research_readiness.md)
+  — blockers, acceptance gates, and proposed epics required for meaningful
+  economic strategy testing.
 - [MVP validation report](reports/final_mvp_validation_performance.md) — current
   verification evidence and limitations.
 

@@ -12,17 +12,28 @@ not historical option-market replay or a live-trading system.
 
 ## Mandatory reading order
 
-Before changing code or documentation, the agent must:
+Before changing code or documentation, every agent must read this file, the
+assigned task brief, its applicable prompt under `docs/prompts/`, and inspect
+the actual code, tests, configuration, branch, base commit, and working tree.
 
-1. read this file;
-2. read the compact [`docs/README.md`](docs/README.md) index and
-   [`docs/architecture/02_system_overview.md`](docs/architecture/02_system_overview.md);
-3. read `docs/architecture/01_btc_24h_rust_python_mvp.md`;
-4. read the canonical input-data contract
-   [`docs/data/okx_btcusdt_swap_1m.md`](docs/data/okx_btcusdt_swap_1m.md);
-5. read [`docs/epics/README.md`](docs/epics/README.md), the canonical brief for
-   the current epic/feature, and the applicable prompt under `docs/prompts/`;
-6. check the actual state of the code, tests, configuration and Git working tree.
+Further reading is proportional to scope under
+[`docs/prompts/README.md`](docs/prompts/README.md):
+
+- a docs-only PATCH reads linked active documents and every contract whose
+  wording it touches;
+- FEATURE/EPIC work also reads the compact
+  [`docs/README.md`](docs/README.md) index,
+  [`docs/architecture/02_system_overview.md`](docs/architecture/02_system_overview.md),
+  [`docs/epics/README.md`](docs/epics/README.md), and its canonical brief;
+- work affecting model, accounting, data, native boundaries, tooling, CI,
+  release, or provenance reads the corresponding sections of
+  `docs/architecture/01_btc_24h_rust_python_mvp.md` and the canonical data
+  contract [`docs/data/okx_btcusdt_swap_1m.md`](docs/data/okx_btcusdt_swap_1m.md)
+  in full as applicable;
+- HIGH_RISK work reads every affected financial/data contract in full.
+
+Proportional reading never permits skipping an applicable financial or data
+contract.
 
 `docs/archive/` contains historical requirements, superseded analysis, and
 future research. It is reference material, not the active Rust implementation
@@ -200,6 +211,12 @@ epic. Coverage exclusions are allowed only through a reviewed path rule with
 justification. An agent must not invent a percentage if the JSON report was not
 actually generated.
 
+The scope-specific check matrix is maintained in
+[`docs/prompts/README.md`](docs/prompts/README.md). Non-executable docs-only
+changes do not require meaningless coverage generation and must report
+`NOT_MEASURED`; executable changes require fresh applicable coverage or an
+honest `NOT_MEASURED`/blocker according to task scope.
+
 ## Git and the working tree
 
 - Before work, record the branch, base commit, and initial `git status`.
@@ -212,31 +229,36 @@ actually generated.
 
 ## Agent workflow
 
-For an epic/feature, use the sequential process from
-[`docs/prompts/README.md`](docs/prompts/README.md):
+Use the classed workflow in
+[`docs/prompts/README.md`](docs/prompts/README.md). The manager records PATCH,
+FEATURE, or EPIC plus risk in the task brief. PATCH may omit reviewer only under
+the strict low-risk, non-normative exception; FEATURE defaults to
+`developer -> QA -> focused reviewer`; EPIC and HIGH_RISK work require
+`developer -> QA -> full reviewer`.
 
-1. the master agent selects the canonical immutable epic brief and records the
-   base commit, user-owned changes, and iteration context without changing its
-   criteria;
-2. developer implements and writes a mini-report;
-3. QA checks quality, tests and coverage and writes a mini-report;
-4. reviewer independently checks compliance with epic and writes findings;
-5. master accepts the result or begins the next iteration.
-
-It is prohibited for multiple agents to modify the same work tree at the same time.
-At most three full `developer → QA → reviewer` iterations are allowed per epic.
+Only one role may write the shared tree at a time. Safe parallel read-only
+investigation is optional only against an identified snapshot and must not
+generate artifacts or mutate state. A narrow same-iteration recheck is limited
+to an unchanged finding set; material scope starts the next full iteration.
+At most three full iterations are allowed per task.
 
 ## Requirements for handoff
 
 Each performer reports:
 
-- task and iteration number;
-- base commit and changed files;
+- task class/risk, iteration or recheck, and stage status;
+- base commit, current HEAD, canonical tracked/untracked dirty-tree digests for
+  the declared relevant paths, tool versions, and changed-file delta;
 - actually implemented behavior;
 - connection with acceptance criteria;
-- exact commands and actual test results;
+- exact commands, actual results, and whether evidence is fresh or validly
+  reused from an unchanged relevant tree;
 - coverage or honest `not measured`;
 - assumptions, risks, blockers and the next recommended step.
+
+Only the manager owns durable acceptance/blocking status. Role-stage status is
+transient and must not be copied into durable final reports. Handoffs should be
+delta-oriented rather than repeat the complete epic history.
 
 Do not write “done,” “all tests passed,” or “meets epic” without
 verifiable evidence from the current working tree.
